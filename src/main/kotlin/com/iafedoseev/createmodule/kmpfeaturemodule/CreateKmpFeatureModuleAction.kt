@@ -10,23 +10,45 @@ import java.io.File
 
 class CreateKmpFeatureModuleAction : AnAction() {
 
-    companion object {
-        // Default base package if no custom configuration is found
-        private const val DEFAULT_BASE_PACKAGE = "com.iafedoseye.chameleon"
+    private fun deriveBasePackage(project: Project): String {
+        val projectBasePath = project.basePath ?: return "com.example"
+
+        // Search for Kotlin source files to derive base package
+        val kotlinSourceDirs = listOf(
+            File(projectBasePath, "src/main/kotlin"),
+            File(projectBasePath, "src/main/java"),
+            File(projectBasePath, "app/src/main/kotlin"),
+            File(projectBasePath, "app/src/main/java")
+        )
+
+        for (sourceDir in kotlinSourceDirs) {
+            if (sourceDir.exists()) {
+                // Recursively search for the first Kotlin file
+                val kotlinFile = sourceDir.walkTopDown()
+                    .filter { it.extension == "kt" }
+                    .firstOrNull()
+
+                if (kotlinFile != null) {
+                    // Extract package name from the first Kotlin file
+                    val fileContent = kotlinFile.readText()
+                    val packageMatch = Regex("""^\s*package\s+([^\s;]+)""", RegexOption.MULTILINE).find(fileContent)
+                    packageMatch?.groupValues?.get(1)?.let {
+                        // Remove last part of package to get base package
+                        return it.split('.').dropLast(1).joinToString(".")
+                    }
+                }
+            }
+        }
+
+        // Fallback to project name-based package
+        return "com.${project.name.lowercase()}"
     }
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
 
-        // 1. Get base package name from user with a default
-        val basePackageName = Messages.showInputDialog(
-            project,
-            "Enter base package name (leave blank for default):",
-            "Base Package Configuration",
-            Messages.getQuestionIcon(),
-            DEFAULT_BASE_PACKAGE,
-            null
-        ) ?: DEFAULT_BASE_PACKAGE
+        // 1. Automatically derive base package name
+        val basePackageName = deriveBasePackage(project)
 
         // 2. Get module name from user
         val moduleName = Messages.showInputDialog(
@@ -57,10 +79,10 @@ class CreateKmpFeatureModuleAction : AnAction() {
                 // 3. Create api and impl subdirectories and their internal structures
                 val apiDir = File(newModuleDir, "api")
                 val implDir = File(newModuleDir, "impl")
-                createSubdirectories(apiDir, implDir, moduleName)
+                createSubdirectories(apiDir, implDir, moduleName, basePackageName)
 
                 // 4. Generate files (interface and build.gradle.kts for api and impl)
-                generateModuleFiles(project, moduleName, apiDir, implDir)
+                generateModuleFiles(project, moduleName, apiDir, implDir, basePackageName)
 
                 // 5. Update settings.gradle.kts
                 updateSettingsGradle(projectBasePath, moduleName)
@@ -95,7 +117,7 @@ class CreateKmpFeatureModuleAction : AnAction() {
         }
     }
 
-    private fun createSubdirectories(apiDir: File, implDir: File, moduleName: String) {
+    private fun createSubdirectories(apiDir: File, implDir: File, moduleName: String, basePackageName: String) {
         // Create main module directory
         val moduleDir = File(apiDir.parentFile, moduleName.lowercase())
         moduleDir.mkdirs()
@@ -118,7 +140,7 @@ class CreateKmpFeatureModuleAction : AnAction() {
         File(implPackageDir, "presentation").mkdirs()
     }
 
-    private fun generateModuleFiles(project: Project, moduleName: String, apiDir: File, implDir: File) {
+    private fun generateModuleFiles(project: Project, moduleName: String, apiDir: File, implDir: File, basePackageName: String) {
         // Create main module directory
         val moduleDir = File(apiDir.parentFile, moduleName.lowercase())
         val renamedApiDir = File(moduleDir, "${moduleName.lowercase()}-api")
