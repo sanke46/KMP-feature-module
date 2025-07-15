@@ -146,19 +146,30 @@ class CreateKmpFeatureModuleAction : AnAction() {
         val renamedApiDir = File(moduleDir, "${moduleName.lowercase()}-api")
         val renamedImplDir = File(moduleDir, "${moduleName.lowercase()}-impl")
 
-        // Generate interface file in api module's common main source
+        // Generate interface file in api module's root source directory
         val apiSourceDir = File(renamedApiDir, "src/commonMain/kotlin")
-        val featureApiFileName = "${moduleName.replaceFirstChar { it.uppercase() }}FeatureApi.kt"
+        val featureApiFileName = "${moduleName.replaceFirstChar { it.uppercase() }}Api.kt"
         val featureApiFile = File(apiSourceDir, featureApiFileName)
-        val packageName = "$basePackageName.${moduleName.lowercase()}api"
         val featureApiContent = """
-  package $packageName
-
-  interface ${moduleName.replaceFirstChar { it.uppercase() }}FeatureApi {
+  interface ${moduleName.replaceFirstChar { it.uppercase() }}Api {
       fun launch()
   }
           """.trimIndent()
         featureApiFile.writeText(featureApiContent)
+
+        // Generate implementation file in impl module's root source directory
+        val implSourceDir = File(renamedImplDir, "src/commonMain/kotlin")
+        val featureImplFileName = "${moduleName.replaceFirstChar { it.uppercase() }}Impl.kt"
+        val featureImplFile = File(implSourceDir, featureImplFileName)
+        val featureImplContent = """
+  class ${moduleName.replaceFirstChar { it.uppercase() }}Impl : ${moduleName.replaceFirstChar { it.uppercase() }}Api {
+      override fun launch() {
+          // Default implementation
+          println("Launching ${moduleName.replaceFirstChar { it.uppercase() }} module")
+      }
+  }
+          """.trimIndent()
+        featureImplFile.writeText(featureImplContent)
 
         // Create build.gradle.kts for api module
         val apiBuildGradleFile = File(renamedApiDir, "build.gradle.kts")
