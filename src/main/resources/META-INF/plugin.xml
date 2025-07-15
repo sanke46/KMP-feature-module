@@ -7,5 +7,25 @@
     The "API & Impl Module Generator" plugin is designed to simplify and accelerate the development process in Android Studio, allowing developers to quickly create API modules and their implementations (Impl) using templates. This tool is especially useful for team collaboration and maintaining code consistency, which contributes to more efficient project management.]]></description>
     <depends>com.intellij.modules.platform</depends>
     <extensions defaultExtensionNs="com.intellij">
+        <action id="KMPFeatureModule.CreateKmpFeatureModule"
+                class="com.iafedoseev.createmodule.kmpfeaturemodule.CreateKmpFeatureModuleAction"
+                text="Create KMP Feature Module"
+                description="Creates a new KMP feature module with API and Impl sub-modules.">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <add-to-group group-id="NewGroup" anchor="last"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="MainMenu" anchor="last"/>
+        </action>
     </extensions>
+
+    <actions>
+        <group id="KMPFeatureModuleGroup" text="KMP Feature Module" description="KMP Feature Module Actions">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <action id="KMPFeatureModule.CreateKmpFeatureModule"
+                    class="com.iafedoseev.createmodule.kmpfeaturemodule.CreateKmpFeatureModuleAction"
+                    text="Create KMP Feature Module"
+                    description="Creates a new KMP feature module with API and Impl sub-modules."/>
+        </group>
+    </actions>
 </idea-plugin>

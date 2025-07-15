@@ -2,6 +2,7 @@ package com.iafedoseev.createmodule.kmpfeaturemodule
 
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.application.ApplicationManager
@@ -9,10 +10,25 @@ import java.io.File
 
 class CreateKmpFeatureModuleAction : AnAction() {
 
+    companion object {
+        // Default base package if no custom configuration is found
+        private const val DEFAULT_BASE_PACKAGE = "com.iafedoseye.chameleon"
+    }
+
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
 
-        // 1. Get module name from user
+        // 1. Get base package name from user with a default
+        val basePackageName = Messages.showInputDialog(
+            project,
+            "Enter base package name (leave blank for default):",
+            "Base Package Configuration",
+            Messages.getQuestionIcon(),
+            DEFAULT_BASE_PACKAGE,
+            null
+        ) ?: DEFAULT_BASE_PACKAGE
+
+        // 2. Get module name from user
         val moduleName = Messages.showInputDialog(
             project,
             "Enter the name for the new KMP Feature Module:",
@@ -41,7 +57,7 @@ class CreateKmpFeatureModuleAction : AnAction() {
                 // 3. Create api and impl subdirectories and their internal structures
                 val apiDir = File(newModuleDir, "api")
                 val implDir = File(newModuleDir, "impl")
-                createSubdirectories(apiDir, implDir)
+                createSubdirectories(apiDir, implDir, moduleName)
 
                 // 4. Generate files (interface and build.gradle.kts for api and impl)
                 generateModuleFiles(project, moduleName, apiDir, implDir)
@@ -49,7 +65,12 @@ class CreateKmpFeatureModuleAction : AnAction() {
                 // 5. Update settings.gradle.kts
                 updateSettingsGradle(projectBasePath, moduleName)
 
-                Messages.showMessageDialog(project, "KMP Feature Module '$moduleName' structure created successfully!", "Success", Messages.getInformationIcon())
+                Messages.showMessageDialog(
+                    project,
+                    "KMP Feature Module '$moduleName' structure created successfully!",
+                    "Success",
+                    Messages.getInformationIcon()
+                )
 
             } catch (ex: Exception) {
                 Messages.showErrorDialog(project, "Error creating module: ${ex.message}", "Error")
@@ -65,121 +86,127 @@ class CreateKmpFeatureModuleAction : AnAction() {
 
         if (!newModuleDir.exists()) {
             newModuleDir.mkdirs()
-            Messages.showInfoMessage(project, "Created module directory: ${newModuleDir.name}", "Module Directory Created")
+            Messages.showInfoMessage(
+                project, "Created module directory: ${newModuleDir.name}", "Module Directory Created"
+            )
         } else {
             Messages.showWarningDialog(project, "Module directory '${moduleName}' already exists.", "Module Exists")
             throw IllegalStateException("Module directory already exists.") // Throw to stop further execution
         }
     }
 
-    private fun createSubdirectories(apiDir: File, implDir: File) {
-        apiDir.mkdirs()
-        implDir.mkdirs()
+    private fun createSubdirectories(apiDir: File, implDir: File, moduleName: String) {
+        // Create main module directory
+        val moduleDir = File(apiDir.parentFile, moduleName.lowercase())
+        moduleDir.mkdirs()
 
-        // Create model directory inside api
-        File(apiDir, "model").mkdirs()
+        // Create api and impl subdirectories
+        val renamedApiDir = File(moduleDir, "${moduleName.lowercase()}-api")
+        val renamedImplDir = File(moduleDir, "${moduleName.lowercase()}-impl")
+        renamedApiDir.mkdirs()
+        renamedImplDir.mkdirs()
 
-        // Create data, di, domain, presentation directories inside impl
-        File(implDir, "data").mkdirs()
-        File(implDir, "di").mkdirs()
-        File(implDir, "domain").mkdirs()
-        File(implDir, "presentation").mkdirs()
+        // Create source directories for api module with package structure
+        val apiPackageDir = File(renamedApiDir, "src/commonMain/kotlin/${basePackageName.replace('.', '/')}/${moduleName.lowercase()}api")
+        apiPackageDir.mkdirs()
 
-        // Create source directories for api module
-        File(apiDir, "src/commonMain/kotlin").mkdirs()
-        File(apiDir, "src/androidMain/kotlin").mkdirs()
-        File(apiDir, "src/desktopMain/kotlin").mkdirs()
-
-        // Create source directories for impl module
-        File(implDir, "src/commonMain/kotlin").mkdirs()
-        File(implDir, "src/androidMain/kotlin").mkdirs()
-        File(implDir, "src/desktopMain/kotlin").mkdirs()
+        // Create source directories for impl module with package structure
+        val implPackageDir = File(renamedImplDir, "src/commonMain/kotlin/${basePackageName.replace('.', '/')}/${moduleName.lowercase()}impl")
+        File(implPackageDir, "data").mkdirs()
+        File(implPackageDir, "di").mkdirs()
+        File(implPackageDir, "domain").mkdirs()
+        File(implPackageDir, "presentation").mkdirs()
     }
 
     private fun generateModuleFiles(project: Project, moduleName: String, apiDir: File, implDir: File) {
-        // Generate interface file in api/model
-        val apiModelDir = File(apiDir, "model")
-        val featureApiFileName = "${moduleName.capitalize()}FeatureApi.kt"
-        val featureApiFile = File(apiModelDir, featureApiFileName)
-        val packageName = "com.iafedoseev.createmodule.${moduleName.toLowerCase()}.api.model"
-        val featureApiContent = """
-package $packageName
+        // Create main module directory
+        val moduleDir = File(apiDir.parentFile, moduleName.lowercase())
+        val renamedApiDir = File(moduleDir, "${moduleName.lowercase()}-api")
+        val renamedImplDir = File(moduleDir, "${moduleName.lowercase()}-impl")
 
-interface ${moduleName.capitalize()}FeatureApi {
-    fun launch()
-}
-        """.trimIndent()
+        // Generate interface file in api module's common main source
+        val apiSourceDir = File(renamedApiDir, "src/commonMain/kotlin")
+        val featureApiFileName = "${moduleName.replaceFirstChar { it.uppercase() }}FeatureApi.kt"
+        val featureApiFile = File(apiSourceDir, featureApiFileName)
+        val packageName = "$basePackageName.${moduleName.lowercase()}api"
+        val featureApiContent = """
+  package $packageName
+
+  interface ${moduleName.replaceFirstChar { it.uppercase() }}FeatureApi {
+      fun launch()
+  }
+          """.trimIndent()
         featureApiFile.writeText(featureApiContent)
 
         // Create build.gradle.kts for api module
-        val apiBuildGradleFile = File(apiDir, "build.gradle.kts")
+        val apiBuildGradleFile = File(renamedApiDir, "build.gradle.kts")
         val apiBuildGradleContent = """
-plugins {
-    kotlin("multiplatform")
-    id("com.android.library")
-}
+  plugins {
+      kotlin("multiplatform")
+      id("com.android.library")
+  }
 
-android {
-    namespace = "com.iafedoseev.createmodule.${moduleName.toLowerCase()}.api"
-    compileSdk = 34
-    defaultConfig {
-        minSdk = 24
-    }
-}
+  android {
+      namespace = "$basePackageName.${moduleName.lowercase()}api"
+      compileSdk = 34
+      defaultConfig {
+          minSdk = 24
+      }
+  }
 
-kotlin {
-    androidTarget()
-    jvm("desktop") // Or other JVM target if needed
+  kotlin {
+      androidTarget()
+      jvm("desktop") // Or other JVM target if needed
 
-    sourceSets {
-        commonMain.dependencies {
-            // Common dependencies
-        }
-        androidMain.dependencies {
-            // Android-specific dependencies
-        }
-        desktopMain.dependencies {
-            // Desktop-specific dependencies
-        }
-    }
-}
-        """.trimIndent()
+      sourceSets {
+          commonMain.dependencies {
+              // Common dependencies
+          }
+          androidMain.dependencies {
+              // Android-specific dependencies
+          }
+          desktopMain.dependencies {
+              // Desktop-specific dependencies
+          }
+      }
+  }
+          """.trimIndent()
         apiBuildGradleFile.writeText(apiBuildGradleContent)
 
         // Create build.gradle.kts for impl module
-        val implBuildGradleFile = File(implDir, "build.gradle.kts")
+        val implBuildGradleFile = File(renamedImplDir, "build.gradle.kts")
         val implBuildGradleContent = """
-plugins {
-    kotlin("multiplatform")
-    id("com.android.library")
-}
+  plugins {
+      kotlin("multiplatform")
+      id("com.android.library")
+  }
 
-android {
-    namespace = "com.iafedoseev.createmodule.${moduleName.toLowerCase()}.impl"
-    compileSdk = 34
-    defaultConfig {
-        minSdk = 24
-    }
-}
+  android {
+      namespace = "$basePackageName.${moduleName.lowercase()}impl"
+      compileSdk = 34
+      defaultConfig {
+          minSdk = 24
+      }
+  }
 
-kotlin {
-    androidTarget()
-    jvm("desktop") // Or other JVM target if needed
+  kotlin {
+      androidTarget()
+      jvm("desktop") // Or other JVM target if needed
 
-    sourceSets {
-        commonMain.dependencies {
-            implementation(project(":features:${moduleName.toLowerCase()}:api"))
-            // Common dependencies
-        }
-        androidMain.dependencies {
-            // Android-specific dependencies
-        }
-        desktopMain.dependencies {
-            // Desktop-specific dependencies
-        }
-    }
-}
-        """.trimIndent()
+      sourceSets {
+          commonMain.dependencies {
+              implementation(project(":features:${moduleName.lowercase()}:${moduleName.lowercase()}-api"))
+              // Common dependencies
+          }
+          androidMain.dependencies {
+              // Android-specific dependencies
+          }
+          desktopMain.dependencies {
+              // Desktop-specific dependencies
+          }
+      }
+  }
+          """.trimIndent()
         implBuildGradleFile.writeText(implBuildGradleContent)
     }
 
@@ -188,9 +215,9 @@ kotlin {
         val settingsGradleContent = settingsGradleFile.readText()
         val newSettingsGradleContent = settingsGradleContent + """
 
-include(":features:${moduleName.toLowerCase()}:api")
-include(":features:${moduleName.toLowerCase()}:impl")
-        """.trimIndent()
+ include(":features:${moduleName.lowercase()}:${moduleName.lowercase()}-api")
+ include(":features:${moduleName.lowercase()}:${moduleName.lowercase()}-impl")
+         """.trimIndent()
         settingsGradleFile.writeText(newSettingsGradleContent)
     }
 }
