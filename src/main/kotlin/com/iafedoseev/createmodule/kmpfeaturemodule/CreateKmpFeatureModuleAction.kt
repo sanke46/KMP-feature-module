@@ -84,12 +84,12 @@ class CreateKmpFeatureModuleAction : AnAction() {
                 // 4. Generate files (interface and build.gradle.kts for api and impl)
                 generateModuleFiles(project, moduleName, apiDir, implDir, basePackageName)
 
-                // 5. Update settings.gradle.kts
+                // 5. Update settings.gradle.kts (now with a comment about manual module inclusion)
                 updateSettingsGradle(projectBasePath, moduleName)
 
                 Messages.showMessageDialog(
                     project,
-                    "KMP Feature Module '$moduleName' structure created successfully!",
+                    "KMP Feature Module '$moduleName' structure created successfully!\n\nNote: You may need to manually add modules to settings.gradle.kts if needed.",
                     "Success",
                     Messages.getInformationIcon()
                 )
@@ -151,10 +151,10 @@ class CreateKmpFeatureModuleAction : AnAction() {
         val featureApiFileName = "${moduleName.replaceFirstChar { it.uppercase() }}Api.kt"
         val featureApiFile = File(apiSourceDir, featureApiFileName)
         val featureApiContent = """
-  interface ${moduleName.replaceFirstChar { it.uppercase() }}Api {
-      fun launch()
-  }
-          """.trimIndent()
+   interface ${moduleName.replaceFirstChar { it.uppercase() }}Api {
+       fun launch()
+   }
+           """.trimIndent()
         featureApiFile.writeText(featureApiContent)
 
         // Generate implementation file in impl module's root source directory
@@ -162,95 +162,98 @@ class CreateKmpFeatureModuleAction : AnAction() {
         val featureImplFileName = "${moduleName.replaceFirstChar { it.uppercase() }}Impl.kt"
         val featureImplFile = File(implSourceDir, featureImplFileName)
         val featureImplContent = """
-  class ${moduleName.replaceFirstChar { it.uppercase() }}Impl : ${moduleName.replaceFirstChar { it.uppercase() }}Api {
-      override fun launch() {
-          // Default implementation
-          println("Launching ${moduleName.replaceFirstChar { it.uppercase() }} module")
-      }
-  }
-          """.trimIndent()
+   class ${moduleName.replaceFirstChar { it.uppercase() }}Impl : ${moduleName.replaceFirstChar { it.uppercase() }}Api {
+       override fun launch() {
+           // Default implementation
+           println("Launching ${moduleName.replaceFirstChar { it.uppercase() }} module")
+       }
+   }
+           """.trimIndent()
         featureImplFile.writeText(featureImplContent)
 
         // Create build.gradle.kts for api module
         val apiBuildGradleFile = File(renamedApiDir, "build.gradle.kts")
         val apiBuildGradleContent = """
-  plugins {
-      kotlin("multiplatform")
-      id("com.android.library")
-  }
+   plugins {
+       kotlin("multiplatform")
+       id("com.android.library")
+   }
 
-  android {
-      namespace = "$basePackageName.${moduleName.lowercase()}api"
-      compileSdk = 34
-      defaultConfig {
-          minSdk = 24
-      }
-  }
+   android {
+       namespace = "$basePackageName.${moduleName.lowercase()}api"
+       compileSdk = 34
+       defaultConfig {
+           minSdk = 24
+       }
+   }
 
-  kotlin {
-      androidTarget()
-      jvm("desktop") // Or other JVM target if needed
+   kotlin {
+       androidTarget()
+       jvm("desktop") // Or other JVM target if needed
 
-      sourceSets {
-          commonMain.dependencies {
-              // Common dependencies
-          }
-          androidMain.dependencies {
-              // Android-specific dependencies
-          }
-          desktopMain.dependencies {
-              // Desktop-specific dependencies
-          }
-      }
-  }
-          """.trimIndent()
+       sourceSets {
+           commonMain.dependencies {
+               // Common dependencies
+           }
+           androidMain.dependencies {
+               // Android-specific dependencies
+           }
+           desktopMain.dependencies {
+               // Desktop-specific dependencies
+           }
+       }
+   }
+           """.trimIndent()
         apiBuildGradleFile.writeText(apiBuildGradleContent)
 
         // Create build.gradle.kts for impl module
         val implBuildGradleFile = File(renamedImplDir, "build.gradle.kts")
         val implBuildGradleContent = """
-  plugins {
-      kotlin("multiplatform")
-      id("com.android.library")
-  }
+   plugins {
+       kotlin("multiplatform")
+       id("com.android.library")
+   }
 
-  android {
-      namespace = "$basePackageName.${moduleName.lowercase()}impl"
-      compileSdk = 34
-      defaultConfig {
-          minSdk = 24
-      }
-  }
+   android {
+       namespace = "$basePackageName.${moduleName.lowercase()}impl"
+       compileSdk = 34
+       defaultConfig {
+           minSdk = 24
+       }
+   }
 
-  kotlin {
-      androidTarget()
-      jvm("desktop") // Or other JVM target if needed
+   kotlin {
+       androidTarget()
+       jvm("desktop") // Or other JVM target if needed
 
-      sourceSets {
-          commonMain.dependencies {
-              implementation(project(":features:${moduleName.lowercase()}:${moduleName.lowercase()}-api"))
-              // Common dependencies
-          }
-          androidMain.dependencies {
-              // Android-specific dependencies
-          }
-          desktopMain.dependencies {
-              // Desktop-specific dependencies
-          }
-      }
-  }
-          """.trimIndent()
+       sourceSets {
+           commonMain.dependencies {
+               implementation(project(":features:${moduleName.lowercase()}:${moduleName.lowercase()}-api"))
+               // Common dependencies
+           }
+           androidMain.dependencies {
+               // Android-specific dependencies
+           }
+           desktopMain.dependencies {
+               // Desktop-specific dependencies
+           }
+       }
+   }
+           """.trimIndent()
         implBuildGradleFile.writeText(implBuildGradleContent)
     }
 
     private fun updateSettingsGradle(projectBasePath: String, moduleName: String) {
         val settingsGradleFile = File(projectBasePath, "settings.gradle.kts")
         val settingsGradleContent = settingsGradleFile.readText()
+        
+        // Добавляем комментарий вместо прямого включения модулей
         val newSettingsGradleContent = settingsGradleContent + """
 
- include(":features:${moduleName.lowercase()}:${moduleName.lowercase()}-api")
- include(":features:${moduleName.lowercase()}:${moduleName.lowercase()}-impl")
-         """.trimIndent()
+ // Manually include modules if needed:
+ // include(":features:${moduleName.lowercase()}:${moduleName.lowercase()}-api")
+ // include(":features:${moduleName.lowercase()}:${moduleName.lowercase()}-impl")
+          """.trimIndent()
         settingsGradleFile.writeText(newSettingsGradleContent)
     }
 }
