@@ -68,7 +68,13 @@ class CreateKmpFeatureModuleAction : AnAction() {
             return
         }
 
+        // Ensure features directory exists
         val featuresDir = File(projectBasePath, "features")
+        if (!featuresDir.exists()) {
+            featuresDir.mkdirs()
+            Messages.showInfoMessage(project, "Created 'features' directory.", "Directory Created")
+        }
+
         val newModuleDir = File(featuresDir, moduleName)
 
         ApplicationManager.getApplication().runWriteAction {
@@ -101,11 +107,6 @@ class CreateKmpFeatureModuleAction : AnAction() {
     }
 
     private fun createBaseDirectories(project: Project, featuresDir: File, newModuleDir: File, moduleName: String) {
-        if (!featuresDir.exists()) {
-            featuresDir.mkdirs()
-            Messages.showInfoMessage(project, "Created 'features' directory.", "Directory Created")
-        }
-
         if (!newModuleDir.exists()) {
             newModuleDir.mkdirs()
             Messages.showInfoMessage(
@@ -146,99 +147,105 @@ class CreateKmpFeatureModuleAction : AnAction() {
         val renamedApiDir = File(moduleDir, "${moduleName.lowercase()}-api")
         val renamedImplDir = File(moduleDir, "${moduleName.lowercase()}-impl")
 
-        // Generate interface file in api module's root source directory
-        val apiSourceDir = File(renamedApiDir, "src/commonMain/kotlin")
+        // Generate interface file in api module's package directory
+        val apiSourceDir = File(renamedApiDir, "src/commonMain/kotlin/${basePackageName.replace('.', '/')}/${moduleName.lowercase()}api")
         val featureApiFileName = "${moduleName.replaceFirstChar { it.uppercase() }}Api.kt"
         val featureApiFile = File(apiSourceDir, featureApiFileName)
         val featureApiContent = """
-   interface ${moduleName.replaceFirstChar { it.uppercase() }}Api {
-       fun launch()
-   }
+package ${basePackageName}.${moduleName.lowercase()}api
+
+interface ${moduleName.replaceFirstChar { it.uppercase() }}Api {
+    fun launch()
+}
            """.trimIndent()
         featureApiFile.writeText(featureApiContent)
 
-        // Generate implementation file in impl module's root source directory
-        val implSourceDir = File(renamedImplDir, "src/commonMain/kotlin")
+        // Generate implementation file in impl module's package directory
+        val implSourceDir = File(renamedImplDir, "src/commonMain/kotlin/${basePackageName.replace('.', '/')}/${moduleName.lowercase()}impl")
         val featureImplFileName = "${moduleName.replaceFirstChar { it.uppercase() }}Impl.kt"
         val featureImplFile = File(implSourceDir, featureImplFileName)
         val featureImplContent = """
-   class ${moduleName.replaceFirstChar { it.uppercase() }}Impl : ${moduleName.replaceFirstChar { it.uppercase() }}Api {
-       override fun launch() {
-           // Default implementation
-           println("Launching ${moduleName.replaceFirstChar { it.uppercase() }} module")
-       }
-   }
+package ${basePackageName}.${moduleName.lowercase()}impl
+
+import ${basePackageName}.${moduleName.lowercase()}api.${moduleName.replaceFirstChar { it.uppercase() }}Api
+
+class ${moduleName.replaceFirstChar { it.uppercase() }}Impl : ${moduleName.replaceFirstChar { it.uppercase() }}Api {
+    override fun launch() {
+        // Default implementation
+        println("Launching ${moduleName.replaceFirstChar { it.uppercase() }} module")
+    }
+}
            """.trimIndent()
         featureImplFile.writeText(featureImplContent)
 
         // Create build.gradle.kts for api module
         val apiBuildGradleFile = File(renamedApiDir, "build.gradle.kts")
         val apiBuildGradleContent = """
-   plugins {
-       kotlin("multiplatform")
-       id("com.android.library")
-   }
+plugins {
+    kotlin("multiplatform")
+    id("com.android.library")
+}
 
-   android {
-       namespace = "$basePackageName.${moduleName.lowercase()}api"
-       compileSdk = 34
-       defaultConfig {
-           minSdk = 24
-       }
-   }
+android {
+    namespace = "$basePackageName.${moduleName.lowercase()}api"
+    compileSdk = 34
+    defaultConfig {
+        minSdk = 24
+    }
+}
 
-   kotlin {
-       androidTarget()
-       jvm("desktop") // Or other JVM target if needed
+kotlin {
+    androidTarget()
+    jvm("desktop") // Or other JVM target if needed
 
-       sourceSets {
-           commonMain.dependencies {
-               // Common dependencies
-           }
-           androidMain.dependencies {
-               // Android-specific dependencies
-           }
-           desktopMain.dependencies {
-               // Desktop-specific dependencies
-           }
-       }
-   }
+    sourceSets {
+        commonMain.dependencies {
+            // Common dependencies
+        }
+        androidMain.dependencies {
+            // Android-specific dependencies
+        }
+        desktopMain.dependencies {
+            // Desktop-specific dependencies
+        }
+    }
+}
            """.trimIndent()
         apiBuildGradleFile.writeText(apiBuildGradleContent)
 
         // Create build.gradle.kts for impl module
         val implBuildGradleFile = File(renamedImplDir, "build.gradle.kts")
         val implBuildGradleContent = """
-   plugins {
-       kotlin("multiplatform")
-       id("com.android.library")
-   }
+plugins {
+    kotlin("multiplatform")
+    id("com.android.library")
+}
 
-   android {
-       namespace = "$basePackageName.${moduleName.lowercase()}impl"
-       compileSdk = 34
-       defaultConfig {
-           minSdk = 24
-       }
-   }
+android {
+    namespace = "$basePackageName.${moduleName.lowercase()}impl"
+    compileSdk = 34
+    defaultConfig {
+        minSdk = 24
+    }
+}
 
-   kotlin {
-       androidTarget()
-       jvm("desktop") // Or other JVM target if needed
+kotlin {
+    androidTarget()
+    jvm("desktop") // Or other JVM target if needed
 
-       sourceSets {
-           commonMain.dependencies {
-               implementation(project(":features:${moduleName.lowercase()}:${moduleName.lowercase()}-api"))
-               // Common dependencies
-           }
-           androidMain.dependencies {
-               // Android-specific dependencies
-           }
-           desktopMain.dependencies {
-               // Desktop-specific dependencies
-           }
-       }
-   }
+    sourceSets {
+        commonMain.dependencies {
+            implementation(project(":features:${moduleName.lowercase()}:${moduleName.lowercase()}-api"))
+            // Common dependencies
+        }
+        androidMain.dependencies {
+            // Android-specific dependencies
+        }
+        desktopMain.dependencies {
+            // Desktop-specific dependencies
+        }
+    }
+}
            """.trimIndent()
         implBuildGradleFile.writeText(implBuildGradleContent)
     }
